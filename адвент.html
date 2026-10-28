@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Еко-Адвент Календар | Друге життя речей</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/comfortaa@5.0.18/index.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/caveat@5.0.17/index.min.css">
+<style>
+  body {
+    font-family: 'Comfortaa', sans-serif;
+    background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 50%, #ffd3b6 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .handwritten { font-family: 'Caveat', cursive; }
+  
+  .cell {
+    position: relative;
+    aspect-ratio: 1;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-style: preserve-3d;
+  }
+  .cell:hover {
+    transform: scale(1.08) rotate(-2deg);
+    z-index: 10;
+  }
+  .cell.opened {
+    opacity: 0.7;
+  }
+  .cell.opened:hover {
+    transform: scale(1.05);
+  }
+  .cell-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15), inset 0 -4px 0 rgba(0,0,0,0.1);
+    backface-visibility: hidden;
+    transition: all 0.6s;
+  }
+  .cell-front {
+    background: linear-gradient(135deg, var(--c1), var(--c2));
+    border: 3px dashed rgba(255,255,255,0.5);
+  }
+  .cell-back {
+    background: linear-gradient(135deg, #fff9e6, #ffe8cc);
+    transform: rotateY(180deg);
+    border: 3px solid #8bc34a;
+  }
+  .cell.opened .cell-front { transform: rotateY(-180deg); }
+  .cell.opened .cell-back { transform: rotateY(0deg); }
+  
+  .day-num {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 900;
+    color: white;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+  }
+  
+  .icon {
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(46, 90, 56, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal-content {
+    background: linear-gradient(135deg, #fffef7, #f5f0dc);
+    border-radius: 1.5rem;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 2rem;
+    position: relative;
+    transform: scale(0.8) translateY(20px);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 4px solid #8bc34a;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal-overlay.active .modal-content {
+    transform: scale(1) translateY(0);
+  }
+  .modal-content::-webkit-scrollbar { width: 8px; }
+  .modal-content::-webkit-scrollbar-track { background: #f0f0f0; border-radius: 4px; }
+  .modal-content::-webkit-scrollbar-thumb { background: #8bc34a; border-radius: 4px; }
+  
+  .leaf {
+    position: fixed;
+    pointer-events: none;
+    z-index: 1;
+    animation: fall linear infinite;
+  }
+  @keyframes fall {
+    0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+  
+  .progress-fill {
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .btn-done {
+    background: linear-gradient(135deg, #8bc34a, #4caf50);
+    transition: all 0.3s;
+  }
+  .btn-done:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(76, 175, 80, 0.4);
+  }
+  .btn-done.completed {
+    background: linear-gradient(135deg, #ffd54f, #ffb300);
+  }
+  
+  .confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+    z-index: 200;
+    animation: confetti-fall 3s ease-out forwards;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+  
+  .pulse {
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  
+  .title-glow {
+    text-shadow: 0 0 20px rgba(255,255,255,0.8), 3px 3px 0 #2e5a38;
+  }
+</style>
+</head>
+<body class="pb-12">
+
+<!-- Падаюче листя -->
+<div id="leaves"></div>
+
+<!-- Header -->
+<header class="relative z-10 pt-8 pb-6 px-4 text-center">
+  <div class="inline-block bg-white/60 backdrop-blur-sm rounded-3xl px-6 py-4 shadow-xl border-4 border-green-600">
+    <h1 class="text-3xl md:text-5xl font-black text-green-800 title-glow mb-2">
+      ♻️ Еко-Адвент Календар ♻️
+    </h1>
+    <p class="handwritten text-xl md:text-2xl text-amber-800">
+      Друге життя речей · 24 творчі завдання
+    </p>
+  </div>
+  
+  <!-- Прогрес -->
+  <div class="max-w-2xl mx-auto mt-6 bg-white/70 backdrop-blur-sm rounded-2xl p-4 shadow-lg border-2 border-green-500">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-green-800 font-bold">Твій прогрес:</span>
+      <span id="progressText" class="text-green-800 font-bold">0 / 24 завдань</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-5 overflow-hidden">
+      <div id="progressBar" class="progress-fill h-full bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500 rounded-full flex items-center justify-end pr-2" style="width: 0%">
+        <span id="progressEmoji" class="text-xs"></span>
+      </div>
+    </div>
+    <div class="flex justify-between mt-2 text-xs text-gray-600">
+      <span>🌱 Початківець</span>
+      <span>🌿 Майстер</span>
+      <span>🌳 Еко-герой</span>
+    </div>
+  </div>
+  
+  <button onclick="resetProgress()" class="mt-4 text-xs text-red-600 hover:text-red-800 underline">
+    🔄 Скинути прогрес
+  </button>
+</header>
+
+<!-- Сітка адвент-календаря -->
+<main class="relative z-10 max-w-6xl mx-auto px-4">
+  <div id="calendar" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 md:gap-4">
+  </div>
+</main>
+
+<!-- Footer -->
+<footer class="relative z-10 text-center mt-12 px-4">
+  <div class="inline-block bg-white/60 backdrop-blur-sm rounded-2xl px-6 py-3 shadow-lg border-2 border-green-500">
+    <p class="handwritten text-lg text-green-800">
+      💚 Пам'ятай: сміття — це ресурс, якому потрібна твоя уява! 💚
+    </p>
+  </div>
+</footer>
+
+<!-- Модальне вікно -->
+<div id="modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-content">
+    <button onclick="closeModal()" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-red-400 hover:bg-red-500 text-white text-2xl font-bold shadow-lg transition">
+      ×
+    </button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const tasks = [
+  {
+    day: 1, icon: "🐦", title: "Пташка-годівничка",
+    color: ["#ff9a9e","#fad0c4"],
+    desc: "Перетвори пластикову пляшку на затишну годівничку для птахів!",
+    materials: ["Пластикова пляшка 1.5л", "Ножиці", "Мотузка або дріт", "Фарби (за бажанням)"],
+    steps: [
+      "Вимий та висуши пляшку.",
+      "Виріж два отвори навпроти один одного (розміром з пташку).",
+      "Зроби маленький отвір знизу для стоку води.",
+      "Протягни мотузку через горлечко для підвішування.",
+      "Прикрась фарбами та насип корм!"
+    ],
+    tip: "💡 Підвішуй годівничку подалі від котів!"
+  },
+  {
+    day: 2, icon: "🖊️", title: "Пенал з джинсів",
+    color: ["#667eea","#764ba2"],
+    desc: "Старі джинси? Зроби стильний пенал для олівців!",
+    materials: ["Шматок джинсової тканини", "Блискавка або ґудзик", "Ножиці", "Нитки з голкою"],
+    steps: [
+      "Виріж прямокутник 25×15 см з джинсів.",
+      "Склади навпіл і зший два боки.",
+      "Виверни на лицьовий бік.",
+      "Приший блискавку або ґудзик зверху.",
+      "Можеш додати кишеню або аплікацію!"
+    ],
+    tip: "💡 Джинсова тканина дуже міцна — пенал прослужить довго!"
+  },
+  {
+    day: 3, icon: "📦", title: "Органайзер з коробки",
+    color: ["#f093fb","#f5576c"],
+    desc: "Перетвори картонну коробку на зручний органайзер для дрібниць.",
+    materials: ["Картонна коробка", "Кольоровий папір або тканина", "Клей ПВА", "Ножиці"],
+    steps: [
+      "Відріж верхню частину коробки.",
+      "Обклей коробку кольоровим папером.",
+      "Зроби внутрішні перегородки з картону.",
+      "Прикрась наклейками, малюнками чи ґудзиками.",
+      "Використовуй для олівців, гумок, дрібниць!"
+    ],
+    tip: "💡 Можна зробити кілька коробок різного розміру і скласти їх разом!"
+  },
+  {
+    day: 4, icon: "🕯️", title: "Свічник зі склянки",
+    color: ["#4facfe","#00f2fe"],
+    desc: "Стара скляна банка стане чарівним свічником.",
+    materials: ["Скляна банка", "Акрилові фарби", "Пензлики", "Свічка"],
+    steps: [
+      "Змий етикетку з банки (теплою водою з милом).",
+      "Розмалюй банку візерунками або зимовим пейзажем.",
+      "Дай висохнути 24 години.",
+      "Обв'яжи мотузкою або стрічкою.",
+      "Постав всередину свічку — магія готова!"
+    ],
+    tip: "💡 Використовуй LED-свічку для безпеки!"
+  },
+  {
+    day: 5, icon: "🔑", title: "Брелок з кришечок",
+    color: ["#fa709a","#fee140"],
+    desc: "Збери різнокольорові кришечки та зроби яскравий брелок!",
+    materials: ["5-7 пластикових кришечок", "Дріт або міцна нитка", "Дриль або шило (з допомогою дорослих)", "Кільце для ключів"],
+    steps: [
+      "Помий та висуши кришечки.",
+      "З допомогою дорослого зроби отвори в центрі кожної.",
+      "Нанизай кришечки на дріт у будь-якому порядку.",
+      "Закріпи кінці та приєднай кільце.",
+      "Носи з гордістю — ти рятуєш планету!"
+    ],
+    tip: "💡 Комбінуй кольори для гарного візерунка!"
+  },
+  {
+    day: 6, icon: "🌸", title: "Квітка з ложок",
+    color: ["#ffecd2","#fcb69f"],
+    desc: "Пластикові ложки перетворяться на чудові квіти!",
+    materials: ["Одноразові пластикові ложки", "Фарби-спрей або акрил", "Картон для серединки", "Клей"],
+    steps: [
+      "Відріж ручки у ложок (залиш 2-3 см).",
+      "Розфарбуй ложки у кольори пелюсток.",
+      "Виріж з картону кружечок для серединки.",
+      "Приклей ложки по колу до серединки.",
+      "Додай блискітки або стрази в центр!"
+    ],
+    tip: "💡 Зроби букет — він ніколи не зів'яне!"
+  },
+  {
+    day: 7, icon: "🖼️", title: "Рамка з паличок",
+    color: ["#a8edea","#fed6e3"],
+    desc: "Палички від морозива — ідеальний матеріал для рамки для фото!",
+    materials: ["10-12 паличок від морозива", "Клей ПВА або пістолет", "Фарби, фломастери", "Фото"],
+    steps: [
+      "Помий та висуши палички.",
+      "Склади 4 палички у квадрат і склей.",
+      "Повтори для задньої стінки.",
+      "Розмалюй лицьову сторону.",
+      "Приклей фото ззаду — рамка готова!"
+    ],
+    tip: "💡 Можна зробити магніт на холодильник!"
+  },
+  {
+    day: 8, icon: "📖", title: "Закладка з журналу",
+    color: ["#d299c2","#fef9d7"],
+    desc: "Яскраві сторінки старого журналу стануть стильною закладкою.",
+    materials: ["Сторінки з яскравими картинками", "Картон", "Клей", "Стрічка"],
+    steps: [
+      "Виріж смужку з журналу 5×20 см.",
+      "Приклей її на картон для міцності.",
+      "Склади навпіл і зроби куточок.",
+      "Прикрась малюнками чи написами.",
+      "Прикріпи стрічку зверху для зручності!"
+    ],
+    tip: "💡 Зроби набір закладок у подарунок друзям!"
+  },
+  {
+    day: 9, icon: "🏺", title: "Ваза з банки",
+    color: ["#89f7fe","#66a6ff"],
+    desc: "Консервна банка — основа для стильної вази!",
+    materials: ["Консервна банка", "Мотузка або шпагат", "Клей", "Ґудзики, бісер"],
+    steps: [
+      "Обережно відкрий банку без гострих країв.",
+      "Помий та висуши.",
+      "Обмотай мотузкою по спіралі, промазуючи клеєм.",
+      "Прикрась ґудзиками, квітами з паперу.",
+      "Налий воду та постав квіти!"
+    ],
+    tip: "💡 Гострі краї можна заклеїти ізолентою!"
+  },
+  {
+    day: 10, icon: "🧸", title: "Лялька з шкарпетки",
+    color: ["#fbc2eb","#a6c1ee"],
+    desc: "Одинока шкарпетка стане милою лялькою-іграшкою!",
+    materials: ["Шкарпетка", "Наповнювач (вата, старі ганчірки)", "Нитки, ґудзики", "Фетр для обличчя"],
+    steps: [
+      "Набий шкарпетку наповнювачем.",
+      "Перев'яжи ниткою, щоб виділити голову.",
+      "Приший ґудзики-очі та рот з ниток.",
+      "Зроби вушка чи шапочку з іншої тканини.",
+      "Одягни сукню з клаптика!"
+    ],
+    tip: "💡 Кожна лялька унікальна — не бійся експериментувати!"
+  },
+  {
+    day: 11, icon: "🎨", title: "Панно з кришечок",
+    color: ["#ff9a9e","#fecfef"],
+    desc: "Створи яскраву картину з різнокольорових кришечок!",
+    materials: ["Картонна основа", "Багато кришечок різних кольорів", "Клей-пістолет", "Олівець для ескізу"],
+    steps: [
+      "Намалюй на картоні простий малюнок (квітка, сонце).",
+      "Підбери кришечки за кольорами.",
+      "Приклеюй кришечки, заповнюючи контур.",
+      "Додай деталі та фон.",
+      "Повісь на стіну — шедевр готовий!"
+    ],
+    tip: "💡 Почни з простих форм — серця, зірки!"
+  },
+  {
+    day: 12, icon: "👜", title: "Сумка з футболки",
+    color: ["#30cfd0","#330867"],
+    desc: "Стара футболка перетвориться на еко-сумку для покупок!",
+    materials: ["Футболка", "Ножиці", "Нитки (за бажанням)"],
+    steps: [
+      "Відріж рукави та верхню частину (вийдуть ручки).",
+      "Виверни навиворіт.",
+      "Зроби бахрому внизу (смужки 5-7 см).",
+      "Зв'яжи протилежні смужки подвійним вузлом.",
+      "Виверни — сумка готова до шопінгу!"
+    ],
+    tip: "💡 Без шиття — ідеально для початківців!"
+  },
+  {
+    day: 13, icon: "🎭", title: "Маска з тарілки",
+    color: ["#f6d365","#fda085"],
+    desc: "Паперова тарілка стане основою для карнавальної маски!",
+    materials: ["Паперова тарілка", "Фарби", "Паличка або гумка", "Блискітки, пір'я"],
+    steps: [
+      "Склади тарілку навпіл і виріж очі.",
+      "Розмалуй у вигляді тварини чи супергероя.",
+      "Приклей пір'я, блискітки, вуха.",
+      "Прикріпи паличку збоку або гумку.",
+      "Влаштуй маскарад!"
+    ],
+    tip: "💡 Зроби цілу колекцію масок!"
+  },
+  {
+    day: 14, icon: "🏮", title: "Ліхтарик з банки",
+    color: ["#ff6e7f","#bfe9ff"],
+    desc: "Бляшанка стане чарівним ліхтариком для вечора.",
+    materials: ["Бляшана банка", "Цвях і молоток (з дорослим!)", "Фарба-спрей", "Свічка"],
+    steps: [
+      "Намалюй на банці візерунок олівцем.",
+      "З допомогою дорослого набий цвяхами дірочки по контуру.",
+      "Налий воду і заморозь (щоб банка не деформувалась).",
+      "Розфарбуй зовні.",
+      "Постав свічку всередину — магічні візерунки на стінах!"
+    ],
+    tip: "💡 Обережно з гострими краями!"
+  },
+  {
+    day: 15, icon: "🎁", title: "Подарункова упаковка",
+    color: ["#e0c3fc","#8ec5fc"],
+    desc: "Зроби унікальну упаковку зі старих газет та журналів!",
+    materials: ["Старі газети/журнали", "Шпагат", "Ножиці", "Клей", "Сухоцвіти або гілочка"],
+    steps: [
+      "Розклей сторінки газети в один шар.",
+      "Загорни подарунок як звичайним папером.",
+      "Обв'яжи шпагатом або мотузкою.",
+      "Прикрась сухоцвітом, гілочкою чи намальованим малюнком.",
+      "Додай листівку з вторсировини!"
+    ],
+    tip: "💡 Вінтажний стиль зараз у моді!"
+  },
+  {
+    day: 16, icon: "🐢", title: "Черепашка з пляшки",
+    color: ["#84fab0","#8fd3f4"],
+    desc: "Пластикова пляшка + кришечки = мила черепашка!",
+    materials: ["Маленька пластикова пляшка", "4 кришечки для лапок", "1 кришечка для голови", "Фарби", "Клей"],
+    steps: [
+      "Поклади пляшку на бік — це панцир.",
+      "Розфарбуй у зелений або будь-який колір.",
+      "Намалюй візерунок на панцирі.",
+      "Приклей кришечки: 4 з боків (лапки), 1 спереду (голова).",
+      "Намалюй очі — черепашка ожила!"
+    ],
+    tip: "💡 Зроби цілу родину черепашок!"
+  },
+  {
+    day: 17, icon: "📓", title: "Блокнот з паперу",
+    color: ["#fddb92","#d1fdff"],
+    desc: "Зошит, використаний з одного боку, стане новим блокнотом!",
+    materials: ["Аркуші, використані з одного боку", "Картон для обкладинки", "Дірокол", "Стрічка або кільця"],
+    steps: [
+      "Збери аркуші, використані з одного боку.",
+      "Склади їх рівно та обріж краї.",
+      "Виріж обкладинку з картону трохи більшого розміру.",
+      "Зроби діроколом отвори зліва.",
+      "Протягни стрічку або одягни кільця — блокнот готовий!"
+    ],
+    tip: "💡 Чиста сторона — для нових ідей!"
+  },
+  {
+    day: 18, icon: "🎐", title: "Мобіль з CD-дисків",
+    color: ["#c471f5","#fa71cd"],
+    desc: "Старі CD-диски стануть блискучим мобілем!",
+    materials: ["3-5 CD-дисків", "Міцна нитка або волосінь", "Паличка (гілочка)", "Бісер, намистини"],
+    steps: [
+      "Зроби отвори в дисках (або обклей їх ниткою).",
+      "Наріж нитки різної довжини.",
+      "Нанижи диски та бісер в будь-якому порядку.",
+      "Прив'яжи нитки до палички.",
+      "Повісь біля вікна — сонячні зайчики гарантовані!"
+    ],
+    tip: "💡 Можна подрібнити диски на шматочки і зробити мозаїку!"
+  },
+  {
+    day: 19, icon: "🎀", title: "Прикраса з ґудзиків",
+    color: ["#ffecd2","#fcb69f"],
+    desc: "Загублені ґудзики стануть яскравим браслетом!",
+    materials: ["Різні ґудзики", "Міцна нитка або гумка", "Голка"],
+    steps: [
+      "Підбери ґудзики за кольором чи розміром.",
+      "Визнач довжину браслета.",
+      "Нанижи ґудзики в будь-якому порядку.",
+      "Зав'яжи міцний вузол або зший кінці.",
+      "Можна зробити також сережки чи кольє!"
+    ],
+    tip: "💡 Комбінуй різні форми та кольори!"
+  },
+  {
+    day: 20, icon: "🏠", title: "Будиночок з пакетів",
+    color: ["#a1c4fd","#c2e9fb"],
+    desc: "Поліетиленові пакети перетворяться на декоративний будиночок!",
+    materials: ["Пакети різних кольорів", "Пластикова пляшка-основа", "Ножиці", "Клей"],
+    steps: [
+      "Наріж пакети на смужки.",
+      "Сплети з них «пряжу» (скрути смужки).",
+      "Обмотай пляшку, формуючи стіни.",
+      "Зроби дах з картону.",
+      "Прикрась вікнами та дверима з пакетів!"
+    ],
+    tip: "💡 Пакети — це поліетилен, він дуже довго розкладається, тому дамо їм друге життя!"
+  },
+  {
+    day: 21, icon: "🌟", title: "Зірка з журналу",
+    color: ["#f5576c","#f093fb"],
+    desc: "Яскраві сторінки журналу — основа для об'ємної зірки!",
+    materials: ["Журнальні сторінки", "Ножиці", "Клей", "Нитка для підвішування"],
+    steps: [
+      "Наріж 12 однакових смужок (1×20 см).",
+      "Зроби з кожної петлю і склей.",
+      "З'єднай петлі між собою, формуючи зірку.",
+      "Закріпи всі елементи клеєм.",
+      "Прикріпи нитку і повісь на ялинку чи стіну!"
+    ],
+    tip: "💡 Зроби гірлянду з багатьох зірок!"
+  },
+  {
+    day: 22, icon: "🎪", title: "Театр з коробки",
+    color: ["#667eea","#764ba2"],
+    desc: "Велика коробка стане ляльковим театром!",
+    materials: ["Велика картонна коробка", "Ножиці або канцелярський ніж", "Фарби", "Папір для завіси"],
+    steps: [
+      "Виріж велике «вікно» в передній стінці — це сцена.",
+      "Розмалюй коробку ззовні.",
+      "Зроби завісу з тканини чи паперу.",
+      "Змайструй ляльок з шкарпеток чи паличок.",
+      "Покажи виставу для родини!"
+    ],
+    tip: "💡 Запроси друзів — разом веселіше!"
+  },
+  {
+    day: 23, icon: "🎄", title: "Ялинка з пляшок",
+    color: ["#11998e","#38ef7d"],
+    desc: "Зелені пластикові пляшки — чудова еко-ялинка!",
+    materials: ["5-7 зелених пластикових пляшок", "Паличка-стовбур", "Ножиці", "Прикраси"],
+    steps: [
+      "Відріж верхню частину пляшок.",
+      "Наріж нижню частину «ялинковими гілками».",
+      "Нанижи яруси на паличку від більшого до меншого.",
+      "Закріпи кожен ярус.",
+      "Прикрась зіркою з кришечки та іграшками!"
+    ],
+    tip: "💡 Така ялинка служитиме багато років!"
+  },
+  {
+    day: 24, icon: "🏆", title: "Фінальний проєкт",
+    color: ["#f7971e","#ffd200"],
+    desc: "Створи власний шедевр з будь-яких матеріалів, що знайдеш вдома!",
+    materials: ["Будь-які вторсировинні матеріали", "Фантазія", "Клей, ножиці, фарби"],
+    steps: [
+      "Оглянь, що можна переробити вдома.",
+      "Придумай, що хочеш створити.",
+      "Зроби ескіз свого проєкту.",
+      "Збери матеріали та створи!",
+      "Сфотографуй та покажи друзям — ти справжній Еко-герой!"
+    ],
+    tip: "💡 Найкращі ідеї приходять, коли не боїшся експериментувати!"
+  }
+];
+
+const STORAGE_KEY = 'eco-advent-progress';
+let completed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+// Створення клітинок
+const calendar = document.getElementById('calendar');
+tasks.forEach(task => {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.style.setProperty('--c1', task.color[0]);
+  cell.style.setProperty('--c2', task.color[1]);
+  if (completed.includes(task.day)) cell.classList.add('opened');
+  
+  cell.innerHTML = `
+    <div class="cell-face cell-front">
+      <div class="text-center">
+        <div class="icon mb-1">${task.icon}</div>
+        <div class="day-num">${task.day}</div>
+      </div>
+    </div>
+    <div class="cell-face cell-back">
+      <div class="text-center">
+        <div class="icon mb-1">${task.icon}</div>
+        <div class="text-2xl font-black text-green-700">${task.day}</div>
+        <div class="text-xs text-green-600 mt-1">✓</div>
+      </div>
+    </div>
+  `;
+  
+  cell.addEventListener('click', () => openModal(task));
+  calendar.appendChild(cell);
+});
+
+// Модальне вікно
+function openModal(task) {
+  const isCompleted = completed.includes(task.day);
+  const modal = document.getElementById('modal');
+  const body = document.getElementById('modalBody');
+  
+  body.innerHTML = `
+    <div class="text-center mb-4">
+      <div class="inline-block text-6xl mb-2 pulse">${task.icon}</div>
+      <div class="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
+        День ${task.day}
+      </div>
+    </div>
+    <h2 class="text-2xl md:text-3xl font-black text-center text-green-800 mb-3">${task.title}</h2>
+    <p class="text-center text-gray-700 mb-5 text-lg">${task.desc}</p>
+    
+    <div class="bg-amber-50 rounded-xl p-4 mb-4 border-2 border-amber-200">
+      <h3 class="font-bold text-amber-800 mb-2">📦 Що потрібно:</h3>
+      <ul class="list-disc list-inside text-gray-700 space-y-1">
+        ${task.materials.map(m => `<li>${m}</li>`).join('')}
+      </ul>
+    </div>
+    
+    <div class="bg-green-50 rounded-xl p-4 mb-4 border-2 border-green-200">
+      <h3 class="font-bold text-green-800 mb-2">🛠️ Як робити:</h3>
+      <ol class="list-decimal list-inside text-gray-700 space-y-2">
+        ${task.steps.map(s => `<li>${s}</li>`).join('')}
+      </ol>
+    </div>
+    
+    <div class="bg-blue-50 rounded-xl p-3 mb-5 border-2 border-blue-200">
+      <p class="text-blue-800 text-sm">${task.tip}</p>
+    </div>
+    
+    <button onclick="toggleComplete(${task.day})" 
+            class="btn-done w-full py-3 rounded-xl text-white font-bold text-lg shadow-lg ${isCompleted ? 'completed' : ''}">
+      ${isCompleted ? '⭐ Завдання виконано! (натисни, щоб скасувати)' : '✅ Я зробив/зробила це!'}
+    </button>
+  `;
+  
+  modal.classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+}
+
+function toggleComplete(day) {
+  const idx = completed.indexOf(day);
+  if (idx > -1) {
+    completed.splice(idx, 1);
+  } else {
+    completed.push(day);
+    launchConfetti();
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(completed));
+  updateProgress();
+  updateCells();
+  closeModal();
+}
+
+function updateCells() {
+  document.querySelectorAll('.cell').forEach((cell, i) => {
+    const day = tasks[i].day;
+    if (completed.includes(day)) {
+      cell.classList.add('opened');
+    } else {
+      cell.classList.remove('opened');
+    }
+  });
+}
+
+function updateProgress() {
+  const count = completed.length;
+  const percent = (count / 24) * 100;
+  document.getElementById('progressBar').style.width = percent + '%';
+  document.getElementById('progressText').textContent = `${count} / 24 завдань`;
+  
+  let emoji = '';
+  if (count >= 24) emoji = '🏆';
+  else if (count >= 16) emoji = '🌳';
+  else if (count >= 8) emoji = '🌿';
+  else if (count > 0) emoji = '🌱';
+  document.getElementById('progressEmoji').textContent = emoji;
+}
+
+function resetProgress() {
+  if (confirm('Ти впевнений/на, що хочеш скинути весь прогрес?')) {
+    completed = [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(completed));
+    updateProgress();
+    updateCells();
+  }
+}
+
+function launchConfetti() {
+  const colors = ['#ff6b6b','#feca57','#48dbfb','#1dd1a1','#f368e0','#ff9ff3'];
+  for (let i = 0; i < 50; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.animationDelay = Math.random() * 0.5 + 's';
+    c.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 3500);
+  }
+}
+
+// Падаюче листя
+function createLeaves() {
+  const container = document.getElementById('leaves');
+  const leafEmojis = ['🍃','🌿','☘️','🍀','🌱'];
+  for (let i = 0; i < 15; i++) {
+    const leaf = document.createElement('div');
+    leaf.className = 'leaf';
+    leaf.textContent = leafEmojis[Math.floor(Math.random() * leafEmojis.length)];
+    leaf.style.left = Math.random() * 100 + 'vw';
+    leaf.style.fontSize = (Math.random() * 20 + 15) + 'px';
+    leaf.style.animationDuration = (Math.random() * 10 + 10) + 's';
+    leaf.style.animationDelay = (Math.random() * 20) + 's';
+    container.appendChild(leaf);
+  }
+}
+createLeaves();
+
+// ESC для закриття
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+updateProgress();
+updateCells();
+</script>
+</body>
+</html>
